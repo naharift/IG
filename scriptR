@@ -1,0 +1,451 @@
+getwd()
+setwd("")
+
+############ LEITURA #####
+
+info1 <- read.csv2("data1.csv", header = T, sep = ",", encoding = "UTF-8")
+info2 <- read.csv2("export_follower-growth.csv", sep =";", header =T)
+
+### DATAS ###
+info1$data <- as.POSIXct(info1$data, format = '%Y-%m-%d %H:%M:%S')
+info1$dia <- as.Date(format(info1$data, format = "%Y/%m/%d"))
+
+info2$dia <- as.POSIXct(info2$Date, format = "%d/%m/%Y")
+
+
+info1$dia <- format(as.Date(info1$data), "%Y-%m-%d")
+info2$dia <- format(as.Date(info2$dia), "%Y-%m-%d")
+
+### AGRUPANDO ###
+base <- merge(info1, info2, by="dia")
+
+
+## FILTROS ##
+bcv <- subset(base, base$tipo == "Video" & base$views != 0)
+bsv <- subset(base, base$tipo != "Video")
+
+#################              ##################
+
+#######################   ORGANIZANDO    ########################
+## Como estamos
+# base completa
+summary(base$likes)
+summary(base$comentarios)
+table(base$tipo)
+summary(base$Followers.evolution)
+summary(base$Followers)
+
+# base com videos
+summary(bcv$likes)
+summary(bcv$comentarios)
+summary(bcv$views)
+
+# base sem videos
+summary(bsv$likes)
+summary(bsv$comentarios)
+
+core <- round(cor(base[,c(4,5,7,11,12)]))
+core1 <- round(cor(bcv[,c(4,5,7,11,12)]))
+core2 <- round(cor(bsv[,c(4,5,11,12)]))
+
+require(corrplot)
+corrplot(core, order="FPC", method="circle",  type="upper",addCoefasPercent = TRUE, addCoef.col="black")
+
+
+###### MEDIAS E MEDIANAS
+
+ybara <- round(mean(bsv$likes))
+ym <- median(bsv$likes)
+
+bsv$ybarra[which(bsv$likes >= ybara)] <- 1
+bsv$ybarra[which(bsv$likes < ybara)] <- 0
+
+bsv$ymd[which(bsv$likes >= ym)] <- 1
+bsv$ymd[which(bsv$likes < ym)] <- 0
+
+ylin <- round(mean(bcv$likes))
+yme <- median(bcv$likes)
+
+bcv$ylinha[which(bcv$likes >= ylin)] <- 1
+bcv$ylinha[which(bcv$likes < ylin)] <- 0
+
+bcv$ymedi[which(bcv$likes >= yme)] <- 1
+bcv$ymedi[which(bcv$likes < yme)] <- 0
+
+yll <- round(mean(base$likes))
+ymm <- median(base$likes)
+
+base$yl[which(base$likes >= yll)] <- 1
+base$yl[which(base$likes < yll)] <- 0
+
+base$ymd[which(base$likes >= ymm)] <- 1
+base$ymd[which(base$likes < ymm)] <- 0
+
+
+
+#################################################3
+
+################## EXPLORATORIA #######################
+a <- base
+
+require(ggplot2)
+u0<-ggplot(a,aes(base$likes,y=base$likes),alpha=I(.4)) + geom_boxplot(alpha = 0.7,fill = "#284c04", colour = "#3a7006") +xlim() xlab("Curtidas") + ylab("") + theme_bw()
+u1<-ggplot(a,aes(x=base$comentarios,y=base$comentarios),alpha=I(.4)) + geom_boxplot(alpha = 0.7,fill = "#4271AE", colour = "#1F3552",) + xlab("Comentários") + ylab("") + theme_bw()
+u2<-ggplot(bcv,aes(x=bcv$views,y=bcv$views),alpha=I(.4)) + geom_boxplot(alpha = 0.7,colour = "#8f1b07", fill = "#bb1b07",) + xlab("Visualizações") + ylab("") + theme_bw()
+u3<-ggplot(a,aes(x=base$Followers.evolution,y=a$Followers.evolution),alpha=I(.4)) + geom_boxplot(alpha = 0.7,fill = "#ffa400", colour = "#f3a100",) + xlab("Seguidores") + ylab("") + theme_bw()
+
+
+require(gridExtra)
+grid.arrange(u0, u1, u2, u3, ncol=2) #BOXPLOT
+
+
+library(plotly)
+p <- plot_ly(base, x = ~comentarios, color = ~tipo, type = "box")
+hide_legend(p)
+
+p1 <- plot_ly(base, x = ~likes, color = ~tipo, type = "box")
+hide_legend(p1)
+
+
+p2 <- plot_ly(base, x = ~Followers.evolution, color = ~tipo, type = "violin")
+hide_legend(p2)
+
+##############    SERIE TEMPORAL    ##############3
+############## SERIE TEMPORAL ######################
+
+install.packages("tseries")
+install.packages("sarima")
+install.packages("lubridate")
+install.packages("data.table")
+install.packages("reshape")
+install.packages("TSA")
+install.packages("forecast")
+install.packages("tidyr")
+
+install.packages("xts")
+install.packages("ggplot2")
+
+## SERIE TEMPORAL
+install.packages("lattice")
+
+library(tseries)
+library(sarima)
+library(lubridate)
+library(data.table)
+library(reshape)
+library(TSA)
+library(forecast)
+library(tidyr)
+
+require(xts)
+require(ggplot2)
+
+## SERIE TEMPORAL
+require(lattice)
+
+geral <- ts(base[,c(4,5,12)], frequency = 1)
+
+ggp1 <- function(which.given, which.panel, ...) {
+  strip.labels <- c("Curtidas", "Comentários", "Seguidores")
+  panel.rect(0, 0, 1, 1, col="#ffe5cc", border=1)
+  panel.text(x=0.5, y=0.5, adj=c(0.5, 0.55), cex=0.95,
+             lab=strip.labels[which.panel[which.given]])
+}
+
+
+xyplot(geral, strip=ggp1, outer=TRUE, ylab=" " )
+
+#### FOTO E POST
+### CURTIDAS
+xcurti <- ts(bsv$likes)
+plot(xcurti)
+
+acf(xcurti)
+pacf(xcurti)
+
+xcsv <- diff(log(xcurti))
+plot(xcsv)
+acf(xcsv)
+pacf(xcsv)
+
+plot(xcsv, main = "Curtidas", xlab="Publicação", ylab="Número de Curtidas", col = "#1F3552")
+abline(h=0, col = "red")
+
+### COMENTARIOS
+xcome <- ts(bsv$comentarios)
+
+plot(xcome)
+
+acf(xcome)
+pacf(xcome)
+
+
+xcosv <- diff(xcome)
+plot(xcosv)
+acf(xcosv)
+pacf(xcosv)
+
+plot(xcosv, main = "Comentários", xlab="Publicação", ylab="Número de Comentários", col = "#ed6f5b")
+abline(h=0, col = "navy")
+
+#### VIDEO
+### CURTIDAS
+xvcurti <- ts(bcv$likes)
+plot(xvcurti)
+
+acf(xvcurti)
+pacf(xvcurti)
+
+xvct <- diff(xvcurti)
+plot(xvct)
+
+plot(xvct, main = "Curtidas", xlab="Publicação", ylab="Número de Curtidas", col = "#543500")
+
+### COMENTARIOS
+xvco <- ts(bcv$comentarios)
+plot(xvco)
+
+acf(xvco)
+pacf(xvco)
+
+xvcm <- diff(xvco)
+plot(xvcm)
+
+plot(xvcm, main = "Comentários", xlab="Publicação", ylab="Número de Comentários", col = "#800080")
+
+### VIEWS
+xvie <- ts(bcv$views[which(bcv$views!=0)])
+plot(xvie)
+
+acf(xvie)
+pacf(xvie)
+
+xvid <- diff(log(xvie))
+plot(xvid)
+
+plot(xvid, main = "Visualizações", xlab="Publicação", ylab="Número de Views", col = "#330033")
+
+### SEGUIDORES
+xfol <- ts(base$Followers.evolution)
+plot(xfol)
+
+acf(xfol)
+pacf(xfol)
+
+xfoll <- diff(log(xfol))
+plot(xfoll)
+
+plot(xfoll, main = "Seguidores", xlab="Publicação", ylab="Saldo de Seguidores", col = "#006600")
+
+#?rugarch
+
+
+#testar modelos a partir das acf e pacf
+
+auto.arima(xvct) #curtida com video
+auto.arima(xcsv) #curtida sem video
+auto.arima(ts(base$likes)) #curtidas
+
+auto.arima(xcosv) #comentario sem video
+auto.arima(xvco) #comentario com video
+auto.arima(ts(base$comentarios))
+
+auto.arima(xvid) #views
+
+auto.arima(xfoll) #seguidores
+
+################### REG LOGISTICA #################
+
+### MODELO COM MEDIA DE CURTIDAS
+colnames(bcv)
+mod1v <- glm(ylinha~comentarios+Followers+views, family = "binomial", data = bcv)
+summary(mod1v) #AIC 325.78
+
+colnames(bsv)
+mod1f <- glm(ybarra~comentarios+Followers.evolution+Followers, family = "binomial", data = bsv)
+summary(mod1f) #AIC 3331.3
+
+colnames(base)
+mod1 <- glm(yl~comentarios+Followers.evolution+Followers+views, family = "binomial", data = base)
+summary(mod1) #AIC 3922.5
+
+
+### MODELO COM MEDIANA DE CURTIDAS
+
+colnames(bcv)
+mod2v <- glm(ymedi~comentarios+Followers+views, family = "binomial", data = bcv)
+summary(mod2v) #AIC 351.85
+
+colnames(bsv)
+mod2f <- glm(ymd~comentarios+Followers.evolution+Followers, family = "binomial", data = bsv)
+summary(mod2f) #AIC 3255.5
+
+colnames(base)
+mod2 <- glm(ymd~comentarios+Followers.evolution+Followers+tipo+views, family = "binomial", data = base)
+summary(mod2) #AIC 3477.4
+
+##################### PROBABILIDADES #####################
+base2 <- base
+bcv2 <- bcv
+bsv2 <- bsv
+
+## E(Y)=exp(modelo)/(1+exp(modelo))
+
+summary(mod1v) #media video
+summary(mod2f) #mediana foto
+summary(mod2) #mediana geral
+
+mod1v$coefficients #bom
+gX0 <- 0.804+0.0378*bcv$comentarios-3.070322e-05*bcv$Followers+0.001*bcv$views
+pichapeu0 <- exp(gX0)/(1+exp(gX0))
+bcv2$prob0 <- pichapeu0
+
+mod2f$coefficients #atentar aos comentarios
+gX1 <- -6.390+6.279497e-02*bsv$comentarios-4.672143e-03*bsv$Followers.evolution+4.172242e-05*bsv$Followers
+pichapeu1 <- exp(gX1)/(1+exp(gX1))
+bsv2$prob1 <- pichapeu1
+
+mod2$coefficients #ruim
+gX2 <- -6.074434+6.219067e-02*base$comentarios-4.527300e-03*base$Followers.evolution+
+  4.171034e-05 *base$Followers+7.336076e-04*base$views
+pichapeu2 <- exp(gX2)/(1+exp(gX2))
+base2$prob2 <- pichapeu2
+
+ggp2 <- function(which.given, which.panel, ...) {
+  strip.labels <- c("Média com Vídeo", "Mediana sem Vídeo", "Mediana Geral")
+  panel.rect(0, 0, 1, 1, col="#ffe5cc", border=1)
+  panel.text(x=0.5, y=0.5, adj=c(0.5, 0.55), cex=0.95,
+             lab=strip.labels[which.panel[which.given]])
+}
+
+
+
+plot(base2$prob2, main= "Probabilidade de Curtidas - Total", type = "l",
+     xlab= "Postagens", ylab = "Probabilidade", col = "navy")
+plot(bsv2$prob1, main= "Probabilidade de Curtidas - Fotos", type = "l",
+     xlab= "Postagens", ylab = "Probabilidade", col = "maroon")
+plot(bcv2$prob0, main= "Probabilidade de Curtidas - Vídeos", type = "l",
+     xlab= "Postagens", ylab = "Probabilidade", col = "purple")
+
+
+##################### COMO ESTAMOS #####################
+
+summary(bsv2$prob1)
+summary(bcv2$prob0)
+
+lcv <- subset(bcv2, bcv2$prob0 <=0.05304) #valores mais baixos
+hcv <- subset(bcv2, bcv2$prob0 > 0.35506) #valores mais altos
+
+lsv <- subset(bsv2, bsv2$prob1 <=0.169376) #valores mais baixos
+hsv <- subset(bsv2, bsv2$prob1 > 0.802780) #valores mais altos
+
+textocv <- data.frame(lcv$texto, hcv$texto)
+textosv <- data.frame(lsv$texto[-1], hsv$texto)
+
+#install.packages("tm")
+#install.packages("SnowballC")
+#install.packages("wordcloud")
+#install.packages("tidyverse")
+#install.packages("tidytext")
+#install.packages("stringr")
+
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(stringi)
+
+remove_acentos<-function(x) chartr("àáâãäèéêëìíîïòóôõöùúûüÀÁÂÃÄÈÉÊËÌÍÎÒÓÔÕÖÙÚÛÜçÇñÑ", "aaaaaeeeeiiiiooooouuuuAAAAAEEEEIIIOOOOOUUUUcCnN", x)
+
+removeChar<-function(x) chartr("character", " ", x)
+
+sinonimosfrequentes<-function(x) {
+  x<-sub("\\<vacinar\\>","vacina",x)
+}
+
+
+## COM VIDEO 
+#textocv$lcv.texto <- iconv(textocv$lcv.texto, from="UTF-8", to="latin1//TRANSLIT")
+
+## GRUPO 25
+textocv$lcv.texto2 <- iconv(textocv$lcv.texto, to="UTF-8", from="UTF-8", "byte")
+
+tt <- str_extract_all(textocv$lcv.texto2, "#\\S+")
+head(tt)
+
+aux <- tt
+auxCorpus <- Corpus(VectorSource(aux))
+wordcloud(auxCorpus)
+auxCorpus <- Corpus(VectorSource(auxCorpus))
+auxCorpus <- tm_map(auxCorpus, remove_acentos)
+auxCorpus <- tm_map(auxCorpus, removeNumbers)
+auxCorpus <- tm_map(auxCorpus, removePunctuation)
+auxCorpus <- tm_map(auxCorpus, sinonimosfrequentes)
+pal1 <- brewer.pal(8,"Dark2")
+wordcloud(aux1Corpus, min.freq=3,
+          max.words=20, random.order=FALSE, rot.per=.15, colors=pal1)
+
+## GRUPO 75
+#textocv$hcv.texto <- iconv(textocv$hcv.texto, from="UTF-8", to="latin1//TRANSLIT")
+textocv$hcv.texto <- iconv(textocv$hcv.texto, to="UTF-8", from="UTF-8", "byte")
+
+
+tt1 <- str_extract_all(textocv$hcv.texto, "#\\S+")
+head(tt1)
+
+aux1 <- tt1
+aux1Corpus <- Corpus(VectorSource(aux1))
+wordcloud(aux1Corpus)
+aux1Corpus <- Corpus(VectorSource(aux1Corpus))
+aux1Corpus <- tm_map(aux1Corpus, remove_acentos)
+aux1Corpus <- tm_map(aux1Corpus, removeNumbers)
+aux1Corpus <- tm_map(aux1Corpus, removePunctuation)
+aux1Corpus <- tm_map(aux1Corpus, sinonimosfrequentes)
+
+
+wordcloud(aux1Corpus, min.freq=3,
+          max.words=20, random.order=FALSE, rot.per=.15, colors=pal1)
+
+
+## SEM VIDEO 
+
+## GRUPO 25
+#textosv$lsv.texto..1. <- iconv(textosv$lsv.texto..1., from="UTF-8", to="latin1//TRANSLIT")
+textosv$lsv.texto1 <- iconv(textosv$lsv.texto..1., from="UTF-8", to = "UTF-8", "byte")
+
+
+tt2 <- str_extract_all(textosv$lsv.texto1, "#\\S+")
+head(tt2)
+
+aux2 <- tt2
+aux2Corpus <- Corpus(VectorSource(aux2))
+wordcloud(aux2Corpus)
+aux2Corpus <- Corpus(VectorSource(aux2Corpus))
+aux2Corpus <- tm_map(aux2Corpus, remove_acentos)
+aux2Corpus <- tm_map(aux2Corpus, removePunctuation)
+aux2Corpus <- tm_map(aux2Corpus, removeNumbers)
+aux2Corpus <- tm_map(aux2Corpus, sinonimosfrequentes)
+pal2 <- brewer.pal(8,"Dark2")
+wordcloud(aux2Corpus, scale=c(8,.2),min.freq=2,
+          max.words=20, random.order=FALSE, rot.per=.15, colors=pal2)
+
+
+## GRUPO 75
+textosv$hsv.texto1 <- iconv(textosv$hsv.texto, to="UTF-8", from="UTF-8", "byte")
+
+tt3 <- str_extract_all(textosv$hsv.texto1, "#\\S+")
+head(tt3)
+
+aux3 <- tt3
+aux3Corpus <- Corpus(VectorSource(aux3))
+wordcloud(aux3Corpus)
+aux3Corpus <- Corpus(VectorSource(aux3Corpus))
+aux3Corpus <- tm_map(aux3Corpus, remove_acentos)
+aux3Corpus <- tm_map(aux3Corpus, removeNumbers)
+aux3Corpus <- tm_map(aux3Corpus, removePunctuation)
+aux3Corpus <- tm_map(aux3Corpus, sinonimosfrequentes)
+wordcloud(aux3Corpus, scale=c(8,.2),min.freq=2,
+          max.words=20, random.order=FALSE, rot.per=.15, colors=pal2)
+### FINDA
